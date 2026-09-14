@@ -23,6 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: 네트워크 진단 (data.go.kr 해외 IP 차단 여부)
+        continue-on-error: true
+        run: |
+          echo "runner IP: $(curl -s --max-time 10 https://api.ipify.org || echo unknown)"
+          for h in apis.data.go.kr www.data.go.kr www.animal.go.kr; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://$h/" || echo FAIL)
+            echo "$h -> $code"
+          done
+
       - name: 공고 수집
         env:
           ANIMAL_API_KEY: ${{ secrets.ANIMAL_API_KEY }}
