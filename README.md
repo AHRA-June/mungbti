@@ -19,6 +19,8 @@
    - Name: `ANIMAL_API_KEY` / Value: 공공데이터포털 인증키 (데이터셋 15098931 활용신청)
 2. **Pages 켜기** — Settings → Pages → Build and deployment → Source: **GitHub Actions**
 3. Actions 탭 → `수집 후 Pages 배포` → **Run workflow** (첫 실행 수동, 이후 매일 자동)
+4. (측정) [goatcounter.com](https://www.goatcounter.com) 무료 가입 — **Code를 반드시 `mungbti`로** (주소가
+   mungbti.goatcounter.com 이어야 페이지에 심어둔 카운터가 잡힘). 가입 전에도 사이트는 정상 작동
 
 ## 멍BTI 쪽 연동 (결과 화면에 붙여넣기)
 

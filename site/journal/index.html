@@ -44,6 +44,12 @@
   button.ghost { font:inherit; padding:13px 16px; border-radius:10px; border:1px solid var(--line);
                  background:var(--surface); color:var(--ink2); cursor:pointer; }
   canvas { display:none; }
+  .photo-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .photo-btn { font-size:13.5px; padding:10px 14px; border-radius:8px; border:1px dashed var(--accent);
+               color:var(--accent-strong); background:var(--surface); cursor:pointer; user-select:none; }
+  #photoPreview { width:52px; height:52px; object-fit:cover; border-radius:10px; border:1px solid var(--line); }
+  .photo-note { font-size:11.5px; color:var(--ink3); }
+  button.small { padding:8px 12px; font-size:13px; }
   footer { margin-top:32px; border-top:1px solid var(--line); padding-top:14px; font-size:12px;
            color:var(--ink3); line-height:1.7; }
 </style>
@@ -56,6 +62,13 @@
 
   <div class="name-row">
     <input type="text" id="dogName" placeholder="아이 이름 (예: 콩이)" maxlength="10">
+  </div>
+  <div class="photo-row">
+    <label class="photo-btn" for="photoInput">📷 오늘 사진 넣기</label>
+    <input type="file" id="photoInput" accept="image/*" hidden>
+    <img id="photoPreview" alt="" hidden>
+    <button class="ghost small" id="photoClear" hidden>빼기</button>
+    <span class="photo-note">사진은 저장되지 않고<br>지금 만드는 카드에만 들어가요</span>
   </div>
   <div class="days" id="days"></div>
 
@@ -158,6 +171,38 @@ $('clearDay').onclick = () => {
   const data = store(); delete data['d'+day]; save(data); load();
 };
 
+let PHOTO = null; // 이미지 비트맵 — 저장하지 않는다 (localStorage 용량·개인정보)
+$('photoInput').onchange = async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  try {
+    PHOTO = await createImageBitmap(f, { imageOrientation: 'from-image' });
+  } catch (err) {
+    // 구형 브라우저 폴백
+    PHOTO = await new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => res(img); img.onerror = rej;
+      img.src = URL.createObjectURL(f);
+    }).catch(() => null);
+  }
+  if (PHOTO) {
+    $('photoPreview').src = URL.createObjectURL(f);
+    $('photoPreview').hidden = false;
+    $('photoClear').hidden = false;
+  }
+};
+$('photoClear').onclick = () => {
+  PHOTO = null; $('photoInput').value = '';
+  $('photoPreview').hidden = true; $('photoClear').hidden = true;
+};
+
+function drawCover(c, img, x, y, w, h){
+  const iw = img.width, ih = img.height;
+  const scale = Math.max(w/iw, h/ih);
+  const sw = w/scale, sh = h/scale;
+  c.drawImage(img, (iw-sw)/2, (ih-sh)/2, sw, sh, x, y, w, h);
+}
+
 function roundRect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r);
   c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 
@@ -167,41 +212,66 @@ $('makeCard').onclick = () => {
   const name = data.name || '아이';
   const c = $('cv').getContext('2d');
   const F = "'Apple SD Gothic Neo','Malgun Gothic',sans-serif";
-  // 바탕
-  c.fillStyle = '#FAF8F3'; c.fillRect(0,0,1080,1350);
-  c.fillStyle = '#2E6B58'; c.fillRect(0,0,1080,14);
-  // 머리
-  c.fillStyle = '#97906F'; c.font = `700 34px ${F}`;
   const today = new Date();
-  c.fillText(`${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`, 72, 110);
-  c.fillStyle = '#262219'; c.font = `700 76px ${F}`;
-  c.fillText(`${name}와의 ${day}일차 🐾`, 72, 210);
-  c.fillStyle = '#6E6656'; c.font = `400 36px ${F}`;
-  c.fillText('예비입양 일지', 72, 268);
-  // 항목
-  let y = 350;
-  ITEMS.forEach(it => {
-    const j = d.picks[it.k];
-    c.fillStyle = '#FFFFFF'; roundRect(c, 72, y, 936, 96, 20); c.fill();
-    c.strokeStyle = '#E6E1D4'; c.lineWidth = 2; roundRect(c, 72, y, 936, 96, 20); c.stroke();
-    c.fillStyle = '#262219'; c.font = `700 38px ${F}`; c.fillText(it.t, 104, y+60);
-    c.font = `400 38px ${F}`;
-    if (j === undefined) { c.fillStyle = '#97906F'; c.textAlign='right'; c.fillText('기록 없음', 976, y+60); }
-    else { c.fillStyle = j===0 ? '#245546' : (it.warn||j===2) ? '#A06B22' : '#6E6656';
-           c.textAlign='right'; c.fillText(`${EMO[j]} ${it.o[j]}`, 976, y+60); }
-    c.textAlign='left';
-    y += 116;
-  });
-  // 메모
-  if (d.memo) {
-    c.fillStyle = '#E3EEE8'; roundRect(c, 72, y+8, 936, 120, 20); c.fill();
-    c.fillStyle = '#245546'; c.font = `700 40px ${F}`;
-    c.fillText(`“${d.memo.slice(0,26)}”`, 104, y+82);
+  const dateStr = `${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
+  c.fillStyle = '#FAF8F3'; c.fillRect(0,0,1080,1350);
+
+  if (PHOTO) {
+    // ── 사진 카드: 위 절반 사진, 아래 요약
+    drawCover(c, PHOTO, 0, 0, 1080, 600);
+    c.fillStyle = '#2E6B58'; c.fillRect(0,0,1080,14);
+    c.fillStyle = '#97906F'; c.font = `700 30px ${F}`; c.fillText(dateStr + ' · 예비입양 일지', 72, 668);
+    c.fillStyle = '#262219'; c.font = `700 68px ${F}`; c.fillText(`${name}와의 ${day}일차 🐾`, 72, 748);
+    let y = 812;
+    ITEMS.forEach(it => {
+      const j = d.picks[it.k];
+      c.font = `700 34px ${F}`; c.fillStyle = '#262219'; c.textAlign = 'left';
+      c.fillText(it.t, 72, y);
+      c.font = `400 34px ${F}`; c.textAlign = 'right';
+      if (j === undefined) { c.fillStyle = '#97906F'; c.fillText('기록 없음', 1008, y); }
+      else { c.fillStyle = j===0 ? '#245546' : (it.warn||j===2) ? '#A06B22' : '#6E6656';
+             c.fillText(`${EMO[j]} ${it.o[j]}`, 1008, y); }
+      c.textAlign = 'left';
+      y += 62;
+    });
+    if (d.memo) {
+      c.fillStyle = '#E3EEE8'; roundRect(c, 72, y+2, 936, 100, 18); c.fill();
+      c.fillStyle = '#245546'; c.font = `700 36px ${F}`;
+      c.fillText(`“${d.memo.slice(0,27)}”`, 100, y+66);
+    }
+    c.fillStyle = '#97906F'; c.font = `400 30px ${F}`;
+    c.fillText('#예비입양일지 #멍BTI #보호견입양', 72, 1300);
+  } else {
+    // ── 기본 카드 (사진 없음)
+    c.fillStyle = '#2E6B58'; c.fillRect(0,0,1080,14);
+    c.fillStyle = '#97906F'; c.font = `700 34px ${F}`;
+    c.fillText(dateStr, 72, 110);
+    c.fillStyle = '#262219'; c.font = `700 76px ${F}`;
+    c.fillText(`${name}와의 ${day}일차 🐾`, 72, 210);
+    c.fillStyle = '#6E6656'; c.font = `400 36px ${F}`;
+    c.fillText('예비입양 일지', 72, 268);
+    let y = 350;
+    ITEMS.forEach(it => {
+      const j = d.picks[it.k];
+      c.fillStyle = '#FFFFFF'; roundRect(c, 72, y, 936, 96, 20); c.fill();
+      c.strokeStyle = '#E6E1D4'; c.lineWidth = 2; roundRect(c, 72, y, 936, 96, 20); c.stroke();
+      c.fillStyle = '#262219'; c.font = `700 38px ${F}`; c.fillText(it.t, 104, y+60);
+      c.font = `400 38px ${F}`;
+      if (j === undefined) { c.fillStyle = '#97906F'; c.textAlign='right'; c.fillText('기록 없음', 976, y+60); }
+      else { c.fillStyle = j===0 ? '#245546' : (it.warn||j===2) ? '#A06B22' : '#6E6656';
+             c.textAlign='right'; c.fillText(`${EMO[j]} ${it.o[j]}`, 976, y+60); }
+      c.textAlign='left';
+      y += 116;
+    });
+    if (d.memo) {
+      c.fillStyle = '#E3EEE8'; roundRect(c, 72, y+8, 936, 120, 20); c.fill();
+      c.fillStyle = '#245546'; c.font = `700 40px ${F}`;
+      c.fillText(`“${d.memo.slice(0,26)}”`, 104, y+82);
+    }
+    c.fillStyle = '#97906F'; c.font = `400 30px ${F}`;
+    c.fillText('#예비입양일지 #멍BTI #보호견입양', 72, 1290);
   }
-  // 푸터
-  c.fillStyle = '#97906F'; c.font = `400 30px ${F}`;
-  c.fillText('#예비입양일지 #멍BTI #보호견입양', 72, 1290);
-  // 다운로드
+
   const a = document.createElement('a');
   a.download = `예비입양일지_${name}_${day}일차.png`;
   a.href = $('cv').toDataURL('image/png');
@@ -211,5 +281,6 @@ $('makeCard').onclick = () => {
 ['dogName','memo'].forEach(id => $(id).addEventListener('change', persist));
 buildQuestions(); load();
 </script>
+<script data-goatcounter="https://mungbti.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 </body>
 </html>

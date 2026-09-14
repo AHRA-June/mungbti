@@ -27,6 +27,15 @@
 
   function esc(s) { var d = document.createElement("span"); d.textContent = s || ""; return d.innerHTML; }
 
+  var GC = "https://mungbti.goatcounter.com/count";
+  function track(path) {
+    try {
+      var u = GC + "?p=" + encodeURIComponent(path) + "&e=true&rnd=" + Date.now();
+      if (navigator.sendBeacon) { navigator.sendBeacon(u); }
+      else { new Image().src = u; }
+    } catch (e) { /* 측정은 실패해도 무해 */ }
+  }
+
   function pick(rows) {
     var pool = rows;
     if (cfg.sigungu) {
@@ -82,6 +91,12 @@
     html += '</div><p class="mbd-foot">성향 표시는 보호센터 기재를 인용한 것으로, 실제 성격은 만나서 확인해 주세요 · ' +
       '<a class="mbd-more" href="' + pageLink + '" target="_blank" rel="noopener">더 많은 아이들 보기 →</a></p></div>';
     el.innerHTML = html;
+    track("/embed/impression");
+    el.querySelectorAll(".mbd-card, .mbd-more").forEach
+      ? el.querySelectorAll(".mbd-card, .mbd-more").forEach(function (a) {
+          a.addEventListener("click", function () { track("/embed/click"); });
+        })
+      : null;
   }
 
   try {
