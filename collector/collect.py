@@ -17,6 +17,7 @@ import re
 import ssl
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -44,14 +45,27 @@ def build_url(endpoint, key, params):
     return f"{endpoint}?serviceKey={enc_key}&{urllib.parse.urlencode(params)}"
 
 
+UA = "Mozilla/5.0 (compatible; mungbti-collector/0.1; +https://github.com/AHRA-June/mungbti)"
+
+
 def call_api(endpoint, key, params, retries=3):
     url = build_url(endpoint, key, dict(params, _type="json"))
     ctx = ssl.create_default_context()
     last = None
     for attempt in range(retries):
         try:
-            with urllib.request.urlopen(url, timeout=40, context=ctx) as r:
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=40, context=ctx) as r:
                 raw = r.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode("utf-8", errors="replace")[:200]
+            except Exception:
+                pass
+            last = f"HTTP {e.code}: {body or e.reason}"
+            time.sleep(2 * (attempt + 1))
+            continue
         except Exception as e:
             last = f"요청 실패: {e}"
             time.sleep(2 * (attempt + 1))
