@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리 동네 보호견</title>
+<meta name="description" content="전국 보호센터 공고 속 강아지들 — 매일 아침 공공데이터로 갱신됩니다.">
+<style>
+  :root {
+    --bg:#FAF8F3; --surface:#fff; --ink:#262219; --ink2:#6E6656; --ink3:#97906F;
+    --accent:#2E6B58; --accent-strong:#245546; --accent-soft:#E3EEE8;
+    --limit:#A06B22; --line:#E6E1D4;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-size:15px; line-height:1.65;
+         font-family:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif; }
+  .wrap { max-width:960px; margin:0 auto; padding:28px 16px 64px; }
+  header h1 { font-size:24px; margin:0 0 4px; }
+  header p { margin:0; color:var(--ink2); font-size:13.5px; }
+  .filters { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 6px; align-items:center; }
+  select { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px;
+           background:var(--surface); color:var(--ink); max-width:46vw; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 4px; }
+  .chip { font-size:12.5px; padding:5px 11px; border-radius:999px; border:1px solid var(--line);
+          background:var(--surface); color:var(--ink2); cursor:pointer; user-select:none; }
+  .chip.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .count { font-size:13px; color:var(--ink3); margin:6px 0 14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:12px; overflow:hidden;
+          display:flex; flex-direction:column; }
+  .ph { aspect-ratio:4/3; background:var(--accent-soft); display:block; width:100%; object-fit:cover; }
+  .ph.none { display:flex; align-items:center; justify-content:center; color:var(--ink3); font-size:13px; }
+  .body { padding:12px 14px 14px; display:flex; flex-direction:column; gap:7px; flex:1; }
+  .kind { font-weight:700; font-size:15px; }
+  .meta { font-size:12.5px; color:var(--ink2); }
+  .tags { display:flex; flex-wrap:wrap; gap:4px; }
+  .tag { font-size:11.5px; padding:2px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); }
+  .tag.warn { background:#F5EBDA; color:var(--limit); }
+  .tag.none { background:transparent; border:1px dashed var(--line); color:var(--ink3); }
+  .mark { font-size:12.5px; color:var(--ink2); display:-webkit-box; -webkit-line-clamp:2;
+          -webkit-box-orient:vertical; overflow:hidden; }
+  .careline { font-size:12px; color:var(--ink3); margin-top:auto; }
+  .careline a { color:var(--accent-strong); text-decoration:none; }
+  .more { margin:22px auto 0; display:block; font:inherit; padding:10px 26px; border-radius:8px;
+          border:1px solid var(--line); background:var(--surface); color:var(--ink); cursor:pointer; }
+  footer { margin-top:40px; border-top:1px solid var(--line); padding-top:16px;
+           font-size:12px; color:var(--ink3); line-height:1.7; }
+  .empty { padding:40px 0; text-align:center; color:var(--ink3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>우리 동네 보호견 🐕</h1>
+    <p>전국 보호센터 공고 속 강아지들 — <span id="updated">불러오는 중…</span></p>
+  </header>
+
+  <div class="filters">
+    <select id="sido"><option value="">시·도 전체</option></select>
+    <select id="sigungu"><option value="">시·군·구 전체</option></select>
+  </div>
+  <div class="chips" id="traitChips"></div>
+  <div class="count" id="count"></div>
+
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="empty" hidden>이 조건의 공고가 지금은 없어요. 지역을 넓혀보세요.</div>
+  <button class="more" id="more" hidden>더 보기</button>
+
+  <footer>
+    <p>· 성향 표시는 각 보호센터가 기재한 특이사항을 그대로 인용·요약한 것으로, 이 사이트의 평가나 보증이 아닙니다.
+       실제 성격은 만나서 확인해 주세요. 기재가 없는 경우 "성향 기재 없음"으로 표시합니다.</p>
+    <p>· 출처: 농림축산검역본부 국가동물보호정보시스템 구조동물 조회 서비스 (공공데이터포털 15098931).
+       개인 임시보호 동물은 포함되지 않습니다. · 입양 문의는 각 보호센터로 연락해 주세요.</p>
+  </footer>
+</div>
+
+<script>
+const TRAITS = ["온순·친화","활발","겁·경계","입질·공격성","짖음"];
+const $ = id => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+let INDEX = null, ROWS = [], shown = 0, activeTraits = new Set();
+const PAGE = 30;
+
+function esc(s){ const d=document.createElement('span'); d.textContent=s||''; return d.innerHTML; }
+
+async function loadIndex(){
+  const r = await fetch('data/index.json', {cache:'no-store'});
+  INDEX = await r.json();
+  const t = new Date(INDEX.updated);
+  $('updated').textContent = `${t.getMonth()+1}/${t.getDate()} 갱신 · 전국 ${INDEX.total.toLocaleString()}마리`;
+  for (const s of INDEX.sido) {
+    const o = document.createElement('option');
+    o.value = s.code; o.textContent = `${s.name} (${s.count})`;
+    $('sido').appendChild(o);
+  }
+  TRAITS.forEach(tr => {
+    const c = document.createElement('span');
+    c.className = 'chip'; c.textContent = tr;
+    c.onclick = () => { c.classList.toggle('on');
+      c.classList.contains('on') ? activeTraits.add(tr) : activeTraits.delete(tr); render(true); };
+    $('traitChips').appendChild(c);
+  });
+  // 쿼리 파라미터 복원 (이름 또는 코드)
+  const qs = params.get('sido');
+  if (qs) {
+    const hit = INDEX.sido.find(s => s.code === qs || s.name.includes(qs));
+    if (hit) { $('sido').value = hit.code; await onSido(params.get('sigungu') || ''); return; }
+  }
+  render(true);
+}
+
+async function onSido(pickSigungu){
+  const code = $('sido').value;
+  $('sigungu').innerHTML = '<option value="">시·군·구 전체</option>';
+  ROWS = [];
+  if (code) {
+    const s = INDEX.sido.find(x => x.code === code);
+    for (const g of (s?.sigungu || [])) {
+      if (!g.count) continue;
+      const o = document.createElement('option');
+      o.value = g.name; o.textContent = `${g.name} (${g.count})`;
+      $('sigungu').appendChild(o);
+    }
+    if (pickSigungu) {
+      const opt = [...$('sigungu').options].find(o => o.value.includes(pickSigungu));
+      if (opt) $('sigungu').value = opt.value;
+    }
+    const r = await fetch(`data/regions/${code}.json`, {cache:'no-store'});
+    ROWS = await r.json();
+  }
+  render(true);
+}
+
+async function allRows(){
+  // 시도 미선택: 전국은 무거우니 상위 3개 시도만 미리보기
+  const tops = [...INDEX.sido].sort((a,b)=>b.count-a.count).slice(0,3);
+  const lists = await Promise.all(tops.map(s =>
+    fetch(`data/regions/${s.code}.json`,{cache:'no-store'}).then(r=>r.json()).catch(()=>[])));
+  return lists.flat();
+}
+
+function filtered(rows){
+  const g = $('sigungu').value;
+  return rows.filter(r =>
+    (!g || (r.org||'').includes(g)) &&
+    (!activeTraits.size || r.traits.some(t => activeTraits.has(t))));
+}
+
+function card(r){
+  const img = r.img
+    ? `<img class="ph" loading="lazy" src="${esc(r.img)}" alt="${esc(r.kind)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'ph none',textContent:'사진 준비 중'}))">`
+    : `<div class="ph none">사진 준비 중</div>`;
+  const sex = {M:'남아',F:'여아'}[r.sex] || '성별 미상';
+  const neuter = r.neuter==='Y' ? '중성화 O' : r.neuter==='N' ? '중성화 X' : '';
+  const tags = r.traits.length
+    ? r.traits.map(t=>`<span class="tag${t==='입질·공격성'?' warn':''}">${esc(t)}</span>`).join('')
+    : `<span class="tag none">성향 기재 없음</span>`;
+  const until = r.until ? `~${r.until.slice(4,6)}/${r.until.slice(6,8)}` : '';
+  return `<div class="card">${img}<div class="body">
+    <div class="kind">${esc(r.kind)||'믹스'} <span class="meta">${until}</span></div>
+    <div class="meta">${esc(r.age)} · ${esc(r.weight)} · ${sex}${neuter?' · '+neuter:''}</div>
+    <div class="tags">${tags}</div>
+    <div class="mark">${esc(r.mark)}</div>
+    <div class="careline">${esc(r.care)}${r.tel?` · <a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>`:''}</div>
+  </div></div>`;
+}
+
+let CURRENT = [];
+async function render(reset){
+  if (reset) {
+    CURRENT = filtered($('sido').value ? ROWS : await allRows());
+    shown = 0; $('grid').innerHTML = '';
+  }
+  const next = CURRENT.slice(shown, shown+PAGE);
+  $('grid').insertAdjacentHTML('beforeend', next.map(card).join(''));
+  shown += next.length;
+  $('count').textContent = CURRENT.length ? `${CURRENT.length}마리` : '';
+  $('empty').hidden = CURRENT.length > 0;
+  $('more').hidden = shown >= CURRENT.length;
+}
+
+$('sido').onchange = () => onSido('');
+$('sigungu').onchange = () => render(true);
+$('more').onclick = () => render(false);
+loadIndex().catch(() => { $('updated').textContent = '데이터를 불러오지 못했어요'; });
+</script>
+</body>
+</html>

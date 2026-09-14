@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>embed 카드 데모</title>
+<style>
+  body { font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif; max-width:480px;
+         margin:0 auto; padding:24px 16px; background:#fff; color:#333; }
+  .fake { border:2px dashed #ddd; border-radius:12px; padding:20px; text-align:center;
+          color:#999; margin-bottom:8px; }
+</style>
+</head>
+<body>
+  <h2>멍BTI 결과 화면 데모</h2>
+  <div class="fake">(여기까지가 멍BTI 결과 영역이라고 가정)<br>당신의 유형: 다정한 산책메이트 🐾</div>
+
+  <!-- ↓ 이 두 줄이 은혜님 쪽에 들어갈 전부 -->
+  <div id="mungbti-dogs"></div>
+  <script src="../embed/card.js"
+          data-target="mungbti-dogs"
+          data-sido="서울특별시"
+          data-sigungu="동대문구"
+          data-traits="온순·친화,활발"
+          data-count="3"></script>
+</body>
+</html>
