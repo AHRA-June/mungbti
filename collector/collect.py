@@ -152,6 +152,8 @@ def main():
     ap.add_argument("--out", default="site/data")
     ap.add_argument("--days", type=int, default=60)
     args = ap.parse_args()
+    # Secret 붙여넣기 때 딸려온 공백·줄바꿈 제거 (2026-09-14 첫 실행 실패 원인)
+    args.key = "".join(args.key.split())
     if not args.key:
         sys.exit("[중단] --key 또는 환경변수 ANIMAL_API_KEY 필요")
 
