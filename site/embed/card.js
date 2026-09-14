@@ -3,7 +3,7 @@
  *
  * 사용법 (멍BTI 결과 페이지에 붙여넣기):
  *   <div id="mungbti-dogs"></div>
- *   <script src="https://ahra-june.github.io/mungbti-shelter/embed/card.js"
+ *   <script src="https://ahra-june.github.io/mungbti/embed/card.js"
  *           data-target="mungbti-dogs"
  *           data-sido="서울특별시"
  *           data-sigungu="동대문구"

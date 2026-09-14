@@ -33,7 +33,7 @@
 
 ```html
 <div id="mungbti-dogs"></div>
-<script src="https://ahra-june.github.io/mungbti-shelter/embed/card.js"
+<script src="https://ahra-june.github.io/mungbti/embed/card.js"
         data-target="mungbti-dogs"
         data-sido="서울특별시"        <!-- 설문에서 받은 시도 -->
         data-sigungu="동대문구"       <!-- 설문에서 받은 시군구 (선택) -->
